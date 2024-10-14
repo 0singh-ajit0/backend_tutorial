@@ -1,61 +1,55 @@
 import { User } from "../models/user.js";
+import bcrypt from "bcrypt";
+import { setToken } from "../utils/features.js";
+import ErrorHandler from "../middlewares/error.js";
 
-export const getAllUsers = async (req, res) => {
-  const users = await User.find({});
+export const signup = async (req, res, next) => {
+  try {
+    const { name, email, password } = req.body;
+    let user = await User.findOne({ email });
 
-  res.json({
-    success: true,
-    users,
-  });
+    if (user) return next(new ErrorHandler("User already exists", 400));
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    user = await User.create({ name, email, password: hashedPassword });
+
+    setToken(user, res, "Registered Successfully", 201);
+  } catch (error) {
+    next(error);
+  }
 };
 
-export const createNewUser = async (req, res) => {
-  const { name, email, password } = req.body;
+export const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    let user = await User.findOne({ email }).select("+password");
 
-  const user = await User.create({
-    name,
-    email,
-    password,
-  });
+    if (user) return next(new ErrorHandler("Invalid email or password", 400));
 
-  res.status(201).cookie("id", user._id.toString()).json({
-    success: true,
-    message: "User created successfully",
-  });
+    if (!bcrypt.compareSync(password, user.password))
+      return next(new ErrorHandler("Invalid email or password", 400));
+
+    setToken(user, res, "Welcome back");
+  } catch (error) {
+    next(error);
+  }
 };
 
-export const specialRoute = (req, res) => {
-  res.json({
-    success: true,
-    message: "Just a special route",
-  });
+export const logout = (req, res) => {
+  res
+    .status(200)
+    .cookie("token", "", {
+      expires: new Date(Date.now()),
+    })
+    .json({
+      success: true,
+      message: "Logged Out",
+    });
 };
 
-export const getUserDetails = async (req, res) => {
-  const user = await User.findById(req.params.id);
-
-  res.json({
+export const getMyProfile = (req, res) => {
+  res.status(200).json({
     success: true,
-    user,
-  });
-};
-
-export const updateUser = async (req, res) => {
-  const user = await User.findById(req.params.id);
-
-  res.json({
-    success: true,
-    message: "Updated",
-  });
-};
-
-export const deleteUser = async (req, res) => {
-  const user = await User.findById(req.params.id);
-
-  await user.deleteOne();
-
-  res.json({
-    success: true,
-    message: "Deleted",
+    user: req.user,
   });
 };
