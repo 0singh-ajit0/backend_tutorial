@@ -24,7 +24,7 @@ export const login = async (req, res, next) => {
     const { email, password } = req.body;
     let user = await User.findOne({ email }).select("+password");
 
-    if (user) return next(new ErrorHandler("Invalid email or password", 400));
+    if (!user) return next(new ErrorHandler("Invalid email or password", 400));
 
     if (!bcrypt.compareSync(password, user.password))
       return next(new ErrorHandler("Invalid email or password", 400));
@@ -40,6 +40,8 @@ export const logout = (req, res) => {
     .status(200)
     .cookie("token", "", {
       expires: new Date(Date.now()),
+      sameSite: "none",
+      secure: true,
     })
     .json({
       success: true,
